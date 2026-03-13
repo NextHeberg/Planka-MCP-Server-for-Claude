@@ -5,6 +5,7 @@ import { createMcpServer } from './server.js';
 import { plankaClient } from './planka/client.js';
 
 const PORT = Number(process.env.PORT) || 3001;
+const ISSUER = process.env.OAUTH_ISSUER || 'https://planka-mcp.nextheberg.com';
 
 async function main() {
   // Authenticate with Planka at startup (fail fast)
@@ -17,7 +18,7 @@ async function main() {
   app.use((_req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, mcp-session-id, last-event-id');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, mcp-session-id, last-event-id');
     res.header('Access-Control-Expose-Headers', 'mcp-session-id');
     if (_req.method === 'OPTIONS') {
       res.sendStatus(200);
@@ -25,6 +26,55 @@ async function main() {
     }
     next();
   });
+
+  // --- OAuth 2.0 passthrough for Claude.ai custom connectors ---
+
+  // In-memory store for authorization codes
+  const authCodes = new Map<string, { redirect_uri: string; code_challenge: string }>();
+
+  // 1. OAuth Authorization Server Metadata
+  app.get('/.well-known/oauth-authorization-server', (_req, res) => {
+    res.json({
+      issuer: ISSUER,
+      authorization_endpoint: `${ISSUER}/oauth/authorize`,
+      token_endpoint: `${ISSUER}/oauth/token`,
+      response_types_supported: ['code'],
+      grant_types_supported: ['authorization_code'],
+      code_challenge_methods_supported: ['S256'],
+    });
+  });
+
+  // 2. Authorization endpoint — generate code and redirect
+  app.get('/oauth/authorize', (req, res) => {
+    const { redirect_uri, state, code_challenge, code_challenge_method: _method, client_id: _clientId } = req.query as Record<string, string>;
+    if (!redirect_uri || !state) {
+      res.status(400).json({ error: 'Missing redirect_uri or state' });
+      return;
+    }
+    const code = randomUUID();
+    authCodes.set(code, { redirect_uri, code_challenge: code_challenge || '' });
+    const url = new URL(redirect_uri);
+    url.searchParams.set('code', code);
+    url.searchParams.set('state', state);
+    res.redirect(url.toString());
+  });
+
+  // 3. Token endpoint — exchange code for access token
+  app.post('/oauth/token', (req, res) => {
+    const { code, redirect_uri: _ruri, code_verifier: _verifier, client_id: _clientId, grant_type: _gt } = req.body ?? {};
+    if (!code || !authCodes.has(code)) {
+      res.status(400).json({ error: 'invalid_grant', error_description: 'Invalid or expired authorization code' });
+      return;
+    }
+    authCodes.delete(code);
+    res.json({
+      access_token: `planka-mcp-token-${randomUUID()}`,
+      token_type: 'Bearer',
+      expires_in: 86400,
+    });
+  });
+
+  // --- end OAuth ---
 
   // Health check
   app.get('/health', (_req, res) => {
@@ -38,8 +88,22 @@ async function main() {
   // Store transports by session ID for multi-session support
   const sessions = new Map<string, { transport: StreamableHTTPServerTransport }>();
 
+  // Auth middleware for /mcp — accept requests with no token or with a valid OAuth token
+  const mcpAuth: express.RequestHandler = (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      next();
+      return;
+    }
+    if (/^Bearer\s+planka-mcp-token-.+$/i.test(authHeader)) {
+      next();
+      return;
+    }
+    res.status(401).json({ error: 'Invalid authorization token' });
+  };
+
   // MCP endpoint — Streamable HTTP
-  app.post('/mcp', async (req, res) => {
+  app.post('/mcp', mcpAuth, async (req, res) => {
     const sessionId = req.headers['mcp-session-id'] as string | undefined;
 
     // If we have a session ID, reuse the existing transport
@@ -84,7 +148,7 @@ async function main() {
   });
 
   // GET /mcp — SSE stream for server-to-client notifications
-  app.get('/mcp', async (req, res) => {
+  app.get('/mcp', mcpAuth, async (req, res) => {
     const sessionId = req.headers['mcp-session-id'] as string | undefined;
     if (!sessionId || !sessions.has(sessionId)) {
       res.status(400).json({ error: 'Invalid or missing session ID' });
@@ -95,7 +159,7 @@ async function main() {
   });
 
   // DELETE /mcp — Close session
-  app.delete('/mcp', async (req, res) => {
+  app.delete('/mcp', mcpAuth, async (req, res) => {
     const sessionId = req.headers['mcp-session-id'] as string | undefined;
     if (!sessionId || !sessions.has(sessionId)) {
       res.status(400).json({ error: 'Invalid or missing session ID' });

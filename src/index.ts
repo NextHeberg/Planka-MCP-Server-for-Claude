@@ -33,12 +33,45 @@ async function main() {
   const authCodes = new Map<string, { redirect_uri: string; code_challenge: string }>();
   const issuedTokens = new Set<string>();
 
+  // In-memory client registry
+  const registeredClients = new Map<string, { client_id: string; client_name: string; redirect_uris: string[] }>();
+
+  // Dynamic Client Registration (RFC 7591)
+  app.post('/oauth/register', (req, res) => {
+    const { client_name, redirect_uris, grant_types, response_types, token_endpoint_auth_method } = req.body ?? {};
+
+    if (!redirect_uris || !Array.isArray(redirect_uris) || redirect_uris.length === 0) {
+      res.status(400).json({ error: 'invalid_client_metadata', error_description: 'redirect_uris is required' });
+      return;
+    }
+
+    const client_id = `client-${randomUUID()}`;
+    const client_secret = `secret-${randomUUID()}`;
+
+    registeredClients.set(client_id, {
+      client_id,
+      client_name: client_name || 'Unknown Client',
+      redirect_uris,
+    });
+
+    res.status(201).json({
+      client_id,
+      client_secret,
+      client_name: client_name || 'Unknown Client',
+      redirect_uris,
+      grant_types: grant_types || ['authorization_code'],
+      response_types: response_types || ['code'],
+      token_endpoint_auth_method: token_endpoint_auth_method || 'client_secret_basic',
+    });
+  });
+
   // 1. OAuth Authorization Server Metadata
   app.get('/.well-known/oauth-authorization-server', (_req, res) => {
     res.json({
       issuer: ISSUER,
       authorization_endpoint: `${ISSUER}/oauth/authorize`,
       token_endpoint: `${ISSUER}/oauth/token`,
+      registration_endpoint: `${ISSUER}/oauth/register`,
       response_types_supported: ['code'],
       grant_types_supported: ['authorization_code'],
       code_challenge_methods_supported: ['S256'],

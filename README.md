@@ -94,6 +94,19 @@ docker compose up -d
 docker compose logs -f planka-mcp
 ```
 
+## Security
+
+Even though the MCP server is exposed on a public domain, it is effectively inaccessible to anyone except Claude. Here's why:
+
+- **OAuth required** — without completing the OAuth flow (which opens an interactive popup in your browser), no one can obtain a valid token. This flow cannot be automated without human interaction.
+- **Tokens stored in memory only** — issued tokens live exclusively in the container's RAM. A container restart invalidates all existing tokens immediately. No database, no persistent storage exposed.
+- **No token = 401** — any direct request to `/mcp` without a valid Bearer token is rejected immediately.
+- **Tokens are unguessable** — format `planka-mcp-token-{uuid}`, with UUID v4 providing 2¹²² possible values.
+
+The only realistic attack surface is token interception in transit — mitigated entirely by HTTPS/TLS. The OAuth discovery endpoints (`/.well-known/*`, `/oauth/authorize`, `/oauth/token`) are public but grant no access without completing the interactive flow.
+
+In practice: only Claude — after **you** have clicked "Authorize" — can use this server.
+
 ## Cost — Using Claude Haiku
 
 Managing Planka tasks (creating cards, updating lists, searching boards…) does **not** require a powerful model. These are structured, low-complexity operations that work perfectly with **Claude Haiku**, Anthropic's fastest and most affordable model.

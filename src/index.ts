@@ -31,6 +31,7 @@ async function main() {
 
   // In-memory store for authorization codes
   const authCodes = new Map<string, { redirect_uri: string; code_challenge: string }>();
+  const issuedTokens = new Set<string>();
 
   // 1. OAuth Authorization Server Metadata
   app.get('/.well-known/oauth-authorization-server', (_req, res) => {
@@ -67,10 +68,21 @@ async function main() {
       return;
     }
     authCodes.delete(code);
+    const token = `planka-mcp-token-${randomUUID()}`;
+    issuedTokens.add(token);
     res.json({
-      access_token: `planka-mcp-token-${randomUUID()}`,
+      access_token: token,
       token_type: 'Bearer',
       expires_in: 86400,
+    });
+  });
+
+  // 4. OAuth Protected Resource Metadata
+  app.get('/.well-known/oauth-protected-resource', (_req, res) => {
+    res.json({
+      resource: ISSUER,
+      authorization_servers: [ISSUER],
+      bearer_methods_supported: ['header'],
     });
   });
 
@@ -88,18 +100,26 @@ async function main() {
   // Store transports by session ID for multi-session support
   const sessions = new Map<string, { transport: StreamableHTTPServerTransport }>();
 
-  // Auth middleware for /mcp — accept requests with no token or with a valid OAuth token
+  // Auth middleware for /mcp — require a valid OAuth token
   const mcpAuth: express.RequestHandler = (req, res, next) => {
     const authHeader = req.headers.authorization;
+
     if (!authHeader) {
-      next();
+      res.setHeader(
+        'WWW-Authenticate',
+        `Bearer realm="planka-mcp", resource_metadata="${ISSUER}/.well-known/oauth-protected-resource"`
+      );
+      res.status(401).json({ error: 'unauthorized', message: 'Authentication required' });
       return;
     }
-    if (/^Bearer\s+planka-mcp-token-.+$/i.test(authHeader)) {
-      next();
+
+    const match = authHeader.match(/^Bearer\s+(.+)$/i);
+    if (!match || !issuedTokens.has(match[1])) {
+      res.status(401).json({ error: 'invalid_token', message: 'Invalid or expired token' });
       return;
     }
-    res.status(401).json({ error: 'Invalid authorization token' });
+
+    next();
   };
 
   // MCP endpoint — Streamable HTTP

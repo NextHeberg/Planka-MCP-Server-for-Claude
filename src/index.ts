@@ -104,7 +104,7 @@ async function main() {
   });
 
   // 3. Token endpoint — exchange code for access token
-  app.post('/oauth/token', (req, res) => {
+  app.post('/oauth/token', express.urlencoded({ extended: false }), (req, res) => {
     const { code, redirect_uri: _ruri, code_verifier: _verifier, client_id: _clientId, grant_type: _gt } = req.body ?? {};
     if (!code || !authCodes.has(code)) {
       res.status(400).json({ error: 'invalid_grant', error_description: 'Invalid or expired authorization code' });

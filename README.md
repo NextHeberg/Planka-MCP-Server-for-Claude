@@ -17,21 +17,30 @@ This server exposes **all** Planka v2 API operations as MCP tools via the **Stre
 
 - Node.js 20+
 - A running Planka v2.x instance
-- An admin or user account on that instance
+- A **dedicated Planka account for Claude** (see below)
+- A **publicly accessible domain** for the MCP server (e.g. `https://planka-mcp.domain.tld`)
 
 ## Quick Start
 
-### 1. Install dependencies
+### 1. Create a dedicated Planka account for Claude
+
+We strongly recommend creating a **dedicated Planka user account** specifically for Claude (e.g. `claude@yourdomain.tld`), rather than using your personal account. This makes it easy to:
+
+- Track exactly which actions Claude performed in the activity log
+- Revoke Claude's access independently without affecting your own account
+- Apply specific permissions (admin or member) scoped to Claude's needs
+
+### 2. Install dependencies
 
 ```bash
 npm install
 ```
 
-### 2. Configure
+### 3. Configure
 
 ```bash
 cp .env.example .env
-# Edit .env with your Planka URL and credentials
+# Edit .env with your Planka URL and Claude's dedicated account credentials
 ```
 
 **Authentication options** (pick one):
@@ -41,25 +50,39 @@ cp .env.example .env
 | API Key (recommended) | `PLANKA_API_KEY` | Never expires. Generate via `planka_create_user_api_key` tool |
 | Email + Password | `PLANKA_EMAIL` + `PLANKA_PASSWORD` | Auto-refreshes JWT on 401 |
 
-### 3. Build and run
+### 4. Expose the server on a public domain
+
+Claude.ai requires the MCP server to be accessible over HTTPS. You need a **public domain** pointing to this server, for example:
+
+```
+https://planka-mcp.domain.tld
+```
+
+Configure your reverse proxy (Nginx, Traefik, Caddy…) to forward HTTPS traffic to `localhost:3001`.
+
+### 5. Build and run
 
 ```bash
 npm run build
 npm start
 ```
 
-### 4. Verify
+### 6. Verify
 
 ```bash
-curl http://localhost:3001/health
+curl https://planka-mcp.domain.tld/health
 # {"status":"ok","planka_url":"http://...","version":"1.0.0"}
 ```
 
-### 5. Add to Claude.ai
+### 7. Add to Claude.ai
 
-1. Go to **Settings** > **Custom Connectors** > **Add**
-2. Set URL to: `http://your-server:3001/mcp`
-3. Save and start using Planka tools in your conversations
+1. Go to **Settings** > **Connectors** > **Add custom connector**
+2. Set the URL to: `https://planka-mcp.domain.tld/mcp`
+
+   > ⚠️ The URL **must include `/mcp`** at the end — Claude.ai will not find the MCP server without it.
+
+3. Click **Add**, then **Connect** and authorize via the OAuth screen
+4. Enable the connector in a conversation via the **"+"** button > **Connectors**
 
 ## Docker
 
@@ -70,6 +93,12 @@ docker compose up -d
 # Check logs
 docker compose logs -f planka-mcp
 ```
+
+## Cost — Using Claude Haiku
+
+Managing Planka tasks (creating cards, updating lists, searching boards…) does **not** require a powerful model. These are structured, low-complexity operations that work perfectly with **Claude Haiku**, Anthropic's fastest and most affordable model.
+
+Using Claude Haiku for Planka operations costs a fraction of Claude Sonnet or Opus — making this connector extremely cost-effective for day-to-day project management automation.
 
 ## Development
 

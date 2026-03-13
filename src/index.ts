@@ -45,9 +45,52 @@ async function main() {
     });
   });
 
-  // 2. Authorization endpoint — generate code and redirect
+  // 2. Authorization endpoint — show consent page
   app.get('/oauth/authorize', (req, res) => {
-    const { redirect_uri, state, code_challenge, code_challenge_method: _method, client_id: _clientId } = req.query as Record<string, string>;
+    const { redirect_uri, state, code_challenge, client_id } = req.query as Record<string, string>;
+    if (!redirect_uri || !state) {
+      res.status(400).json({ error: 'Missing redirect_uri or state' });
+      return;
+    }
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Planka MCP – Authorize</title>
+  <style>
+    body { font-family: system-ui, sans-serif; display: flex; align-items: center;
+           justify-content: center; min-height: 100vh; margin: 0; background: #f5f5f5; }
+    .card { background: white; border-radius: 12px; padding: 2rem; max-width: 400px;
+            width: 90%; box-shadow: 0 4px 24px rgba(0,0,0,0.1); text-align: center; }
+    .logo { font-size: 2rem; margin-bottom: 1rem; }
+    h1 { font-size: 1.25rem; margin: 0 0 0.5rem; }
+    p { color: #666; font-size: 0.9rem; margin: 0 0 1.5rem; }
+    button { background: #2563eb; color: white; border: none; border-radius: 8px;
+             padding: 0.75rem 2rem; font-size: 1rem; cursor: pointer; width: 100%; }
+    button:hover { background: #1d4ed8; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">🔌</div>
+    <h1>Connect to Planka MCP</h1>
+    <p>Claude is requesting access to manage your Planka boards and projects.</p>
+    <form method="POST" action="/oauth/authorize">
+      <input type="hidden" name="redirect_uri" value="${redirect_uri}">
+      <input type="hidden" name="state" value="${state}">
+      <input type="hidden" name="code_challenge" value="${code_challenge || ''}">
+      <input type="hidden" name="client_id" value="${client_id || ''}">
+      <button type="submit">Authorize Access</button>
+    </form>
+  </div>
+</body>
+</html>`);
+  });
+
+  // 2b. Authorization endpoint — handle consent form submission
+  app.post('/oauth/authorize', express.urlencoded({ extended: false }), (req, res) => {
+    const { redirect_uri, state, code_challenge, client_id: _clientId } = req.body ?? {};
     if (!redirect_uri || !state) {
       res.status(400).json({ error: 'Missing redirect_uri or state' });
       return;

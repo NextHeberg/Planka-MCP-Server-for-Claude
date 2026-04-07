@@ -1,20 +1,26 @@
-# --- Stage 1 : Build ---
-FROM node:20-alpine AS builder
+# NOTE: Due to Docker DNS issues with VPN nameservers, this Dockerfile uses
+# pre-built artifacts from the host. Run before building:
+#   npm ci && npm run build
+#
+# For a permanent fix, add DNS to /etc/docker/daemon.json:
+#   "dns": ["8.8.8.8", "8.8.4.4"]
+# then restart Docker.
+
+# --- Stage 1 : Prune dev dependencies ---
+FROM node:20-slim AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
+COPY node_modules ./node_modules
+# Remove dev dependencies without network access
+RUN npm prune --omit=dev
 
 # --- Stage 2 : Production ---
-FROM node:20-alpine AS runner
+FROM node:20-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Copy only what's needed
-COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
-COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY dist ./dist
 
 # Security: don't run as root
 USER node

@@ -1,5 +1,8 @@
 import express from 'express';
 import { randomUUID } from 'node:crypto';
+
+const escHtml = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createMcpServer } from './server.js';
 import { plankaClient } from './planka/client.js';
@@ -110,10 +113,10 @@ async function main() {
     <h1>Connect to Planka MCP</h1>
     <p>Claude is requesting access to manage your Planka boards and projects.</p>
     <form method="POST" action="/oauth/authorize">
-      <input type="hidden" name="redirect_uri" value="${redirect_uri}">
-      <input type="hidden" name="state" value="${state}">
-      <input type="hidden" name="code_challenge" value="${code_challenge || ''}">
-      <input type="hidden" name="client_id" value="${client_id || ''}">
+      <input type="hidden" name="redirect_uri" value="${escHtml(redirect_uri)}">
+      <input type="hidden" name="state" value="${escHtml(state)}">
+      <input type="hidden" name="code_challenge" value="${escHtml(code_challenge || '')}">
+      <input type="hidden" name="client_id" value="${escHtml(client_id || '')}">
       <button type="submit">Authorize Access</button>
     </form>
   </div>

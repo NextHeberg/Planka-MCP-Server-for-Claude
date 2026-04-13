@@ -2,9 +2,11 @@ version: '3.8'
 
 services:
   planka-mcp:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/nextheberg/planka-mcp-server-for-claude:latest
+    # To build locally instead: comment the image line above and uncomment below
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
     container_name: planka-mcp
     ports:
       - "${PORT:-3001}:3001"

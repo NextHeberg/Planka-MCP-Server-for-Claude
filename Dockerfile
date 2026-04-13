@@ -1,26 +1,24 @@
-# NOTE: Due to Docker DNS issues with VPN nameservers, this Dockerfile uses
-# pre-built artifacts from the host. Run before building:
-#   npm ci && npm run build
-#
-# For a permanent fix, add DNS to /etc/docker/daemon.json:
-#   "dns": ["8.8.8.8", "8.8.4.4"]
-# then restart Docker.
-
-# --- Stage 1 : Prune dev dependencies ---
+# --- Stage 1: Build ---
 FROM node:20-slim AS builder
 WORKDIR /app
+
 COPY package*.json ./
-COPY node_modules ./node_modules
-# Remove dev dependencies without network access
+RUN npm ci
+
+COPY tsconfig.json ./
+COPY src ./src
+RUN npm run build
+
+# Remove dev dependencies
 RUN npm prune --omit=dev
 
-# --- Stage 2 : Production ---
+# --- Stage 2: Production ---
 FROM node:20-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
 COPY --from=builder /app/node_modules ./node_modules
-COPY dist ./dist
+COPY --from=builder /app/dist ./dist
 
 # Security: don't run as root
 USER node

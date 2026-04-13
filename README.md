@@ -86,12 +86,48 @@ curl https://planka-mcp.domain.tld/health
 
 ## Docker
 
+A pre-built image is automatically published to the GitHub Container Registry on every push to `main` and on every version tag (`v*`).
+
+```
+ghcr.io/nextheberg/planka-mcp-server-for-claude:latest
+```
+
+### Run with docker compose (recommended)
+
+The provided `docker-compose.yml` pulls the pre-built image by default:
+
 ```bash
-# Build and run
+# Pull latest image and start
 docker compose up -d
 
 # Check logs
 docker compose logs -f planka-mcp
+```
+
+### Run with docker directly
+
+```bash
+docker run -d \
+  --name planka-mcp \
+  --restart unless-stopped \
+  -p 3001:3001 \
+  --env-file .env \
+  ghcr.io/nextheberg/planka-mcp-server-for-claude:latest
+```
+
+### Build locally
+
+To build the image from source instead of pulling it:
+
+```bash
+# Edit docker-compose.yml: comment out `image:` and uncomment `build:`
+docker compose up -d --build
+```
+
+Or directly:
+
+```bash
+docker build -t planka-mcp-server .
 ```
 
 ## Security

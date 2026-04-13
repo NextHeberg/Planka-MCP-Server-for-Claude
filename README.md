@@ -6,6 +6,21 @@ MCP (Model Context Protocol) server that connects [Planka](https://planka.app/) 
 
 This server exposes **all** Planka v2 API operations as MCP tools via the **Streamable HTTP** transport, making it compatible with Claude.ai custom connectors.
 
+## Table of Contents
+
+- [Features](#features)
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [Docker](#docker)
+- [Security](#security)
+- [Cost — Using Claude Haiku](#cost--using-claude-haiku)
+- [Development](#development)
+- [Environment Variables](#environment-variables)
+- [Available MCP Tools (75+)](#available-mcp-tools-75)
+- [Usage Examples](#usage-examples-natural-language-in-claude)
+- [Architecture](#architecture)
+- [License](#license)
+
 ## Features
 
 - **75+ MCP tools** covering every Planka API endpoint

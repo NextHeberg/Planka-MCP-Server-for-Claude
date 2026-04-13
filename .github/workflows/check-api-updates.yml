@@ -57,18 +57,18 @@ jobs:
           print(f"Changes detected: remote v{r_ver}, local v{l_ver}, {len(new_eps)} new endpoint(s).")
 
           lines = [
-              "## Planka API — nouveaux endpoints détectés",
+              "## Planka API — new endpoints detected",
               "",
               "| | Version |",
               "|---|---|",
-              f"| Officiel (plankanban.github.io) | `{r_ver}` |",
-              f"| Local (swagger.json dans le repo) | `{l_ver}` |",
+              f"| Official (plankanban.github.io) | `{r_ver}` |",
+              f"| Local (swagger.json in repo) | `{l_ver}` |",
               "",
           ]
 
           if new_eps:
               lines += [
-                  f"### Endpoints présents dans le spec officiel mais absents localement ({len(new_eps)})",
+                  f"### Endpoints present in the official spec but missing locally ({len(new_eps)})",
                   "",
               ]
               for ep in new_eps:
@@ -76,15 +76,15 @@ jobs:
               lines.append("")
 
           lines += [
-              "### Prochaines étapes suggérées",
+              "### Suggested next steps",
               "",
-              "1. Mettre à jour `swagger.json` avec le fichier officiel",
-              "2. Implémenter les nouveaux MCP tools correspondants dans `src/`",
-              "3. Mettre à jour la section **Available MCP Tools** du README",
+              "1. Update `swagger.json` with the official file",
+              "2. Implement the corresponding MCP tools in `src/`",
+              "3. Update the **Available MCP Tools** section in the README",
               "",
               "---",
-              "_Détecté automatiquement par le workflow "
-              "[Check Planka API updates](../../actions/workflows/check-api-updates.yml)_",
+              "_Auto-detected by the "
+              "[Check Planka API updates](../../actions/workflows/check-api-updates.yml) workflow._",
           ]
 
           with open('/tmp/issue_body.md', 'w') as f:
@@ -141,7 +141,7 @@ jobs:
             const body     = fs.readFileSync('/tmp/issue_body.md', 'utf8');
             const existing = '${{ steps.existing.outputs.result }}';
             const version  = '${{ steps.diff.outputs.remote_version }}';
-            const title    = `[API Sync] Nouveaux endpoints Planka détectés (v${version})`;
+            const title    = `[API Sync] New Planka endpoints detected (v${version})`;
 
             if (existing) {
               await github.rest.issues.update({

@@ -1,0 +1,164 @@
+name: Check Planka API updates
+
+on:
+  schedule:
+    - cron: '0 8 * * 1'  # Every Monday at 08:00 UTC
+  workflow_dispatch:       # Manual trigger from GitHub UI
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch official Planka swagger.json
+        run: |
+          curl -sSf https://plankanban.github.io/planka/swagger-ui/swagger.json \
+            -o /tmp/swagger-remote.json
+
+      - name: Detect endpoint diff
+        id: diff
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+
+          with open('/tmp/swagger-remote.json') as f:
+              remote = json.load(f)
+          with open('swagger.json') as f:
+              local = json.load(f)
+
+          def endpoints(spec):
+              return {
+                  f"{m.upper()} {path}"
+                  for path, methods in spec.get('paths', {}).items()
+                  for m in methods
+                  if m in ('get', 'post', 'put', 'patch', 'delete')
+              }
+
+          remote_eps = endpoints(remote)
+          local_eps  = endpoints(local)
+          new_eps    = sorted(remote_eps - local_eps)
+
+          r_ver = remote.get('info', {}).get('version', '?')
+          l_ver = local.get('info',  {}).get('version', '?')
+
+          gho = os.environ['GITHUB_OUTPUT']
+
+          if not new_eps and r_ver == l_ver:
+              print(f"No changes — both at v{r_ver}.")
+              open(gho, 'a').write('has_changes=false\n')
+              sys.exit(0)
+
+          print(f"Changes detected: remote v{r_ver}, local v{l_ver}, {len(new_eps)} new endpoint(s).")
+
+          lines = [
+              "## Planka API — nouveaux endpoints détectés",
+              "",
+              "| | Version |",
+              "|---|---|",
+              f"| Officiel (plankanban.github.io) | `{r_ver}` |",
+              f"| Local (swagger.json dans le repo) | `{l_ver}` |",
+              "",
+          ]
+
+          if new_eps:
+              lines += [
+                  f"### Endpoints présents dans le spec officiel mais absents localement ({len(new_eps)})",
+                  "",
+              ]
+              for ep in new_eps:
+                  lines.append(f"- `{ep}`")
+              lines.append("")
+
+          lines += [
+              "### Prochaines étapes suggérées",
+              "",
+              "1. Mettre à jour `swagger.json` avec le fichier officiel",
+              "2. Implémenter les nouveaux MCP tools correspondants dans `src/`",
+              "3. Mettre à jour la section **Available MCP Tools** du README",
+              "",
+              "---",
+              "_Détecté automatiquement par le workflow "
+              "[Check Planka API updates](../../actions/workflows/check-api-updates.yml)_",
+          ]
+
+          with open('/tmp/issue_body.md', 'w') as f:
+              f.write('\n'.join(lines))
+
+          with open(gho, 'a') as f:
+              f.write('has_changes=true\n')
+              f.write(f'remote_version={r_ver}\n')
+          PY
+
+      - name: Check for existing open api-sync issue
+        if: steps.diff.outputs.has_changes == 'true'
+        id: existing
+        uses: actions/github-script@v7
+        with:
+          result-encoding: string
+          script: |
+            const { data } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'api-sync',
+              per_page: 1,
+            });
+            return data.length > 0 ? String(data[0].number) : '';
+
+      - name: Ensure label api-sync exists
+        if: steps.diff.outputs.has_changes == 'true' && steps.existing.outputs.result == ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              await github.rest.issues.getLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'api-sync',
+              });
+            } catch {
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'api-sync',
+                color: '0075ca',
+                description: 'Planka API sync — new endpoints detected',
+              });
+            }
+
+      - name: Open or update issue
+        if: steps.diff.outputs.has_changes == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs       = require('fs');
+            const body     = fs.readFileSync('/tmp/issue_body.md', 'utf8');
+            const existing = '${{ steps.existing.outputs.result }}';
+            const version  = '${{ steps.diff.outputs.remote_version }}';
+            const title    = `[API Sync] Nouveaux endpoints Planka détectés (v${version})`;
+
+            if (existing) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: parseInt(existing),
+                title,
+                body,
+              });
+              core.notice(`Issue #${existing} updated.`);
+            } else {
+              const { data } = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['api-sync'],
+              });
+              core.notice(`Issue #${data.number} created: ${data.html_url}`);
+            }

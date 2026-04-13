@@ -1,5 +1,7 @@
 # Planka MCP Server for Claude
 
+[![Docker Build & Publish](https://github.com/NextHeberg/Planka-MCP-Server-for-Claude/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/NextHeberg/Planka-MCP-Server-for-Claude/actions/workflows/docker-publish.yml)
+
 MCP (Model Context Protocol) server that connects [Planka](https://planka.app/) kanban boards to Claude.ai for AI-powered project management.
 
 This server exposes **all** Planka v2 API operations as MCP tools via the **Streamable HTTP** transport, making it compatible with Claude.ai custom connectors.
@@ -11,7 +13,7 @@ This server exposes **all** Planka v2 API operations as MCP tools via the **Stre
 - **Dual authentication**: API key (recommended) or email/password with auto-refresh on 401
 - **Composite tools**: board overview, project overview, cross-project card search, "my cards"
 - **Multi-session support**: each Claude conversation gets its own MCP session
-- **Docker ready**: multi-stage Dockerfile + docker-compose
+- **Docker ready**: pre-built image on `ghcr.io`, multi-stage Dockerfile + docker-compose
 
 ## Prerequisites
 

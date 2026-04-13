@@ -189,7 +189,7 @@ async function main() {
       return;
     }
 
-    const match = authHeader.match(/^Bearer\s+(.+)$/i);
+    const match = authHeader.match(/^Bearer\s+(\S+)$/i);
     if (!match || !issuedTokens.has(match[1])) {
       res.status(401).json({ error: 'invalid_token', message: 'Invalid or expired token' });
       return;
